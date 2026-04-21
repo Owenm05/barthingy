@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Bar Management System</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background: #1f1f1f;
+        color: #eee;
+        padding: 20px;
+    }
+    h1, h2 {
+        color: #f4c430;
+    }
+    input, button, select {
+        padding: 8px;
+        margin: 5px 0;
+        width: 100%;
+    }
+    button {
+        background: #f4c430;
+        border: none;
+        cursor: pointer;
+    }
+    button:hover {
+        background: #d9aa1e;
+    }
+    .panel {
+        background: #333;
+        padding: 20px;
+        border-radius: 8px;
+        max-width: 700px;
+        margin-bottom: 20px;
+    }
+    .tabs button {
+        width: auto;
+        margin-right: 5px;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+    }
+    th, td {
+        border: 1px solid #444;
+        padding: 8px;
+        text-align: center;
+    }
+</style>
+</head>
+<body>
+
+<h1>🍺 Bar Management System</h1>
+
+<!-- AUTH -->
+<div id="auth" class="panel">
+    <h2>Login</h2>
+    <input id="loginUser" placeholder="Username">
+    <input id="loginPass" type="password" placeholder="Password">
+    <button onclick="login()">Login</button>
+
+    <h2>Register</h2>
+    <input id="regUser" placeholder="Username">
+    <input id="regPass" type="password" placeholder="Password">
+    <button onclick="register()">Register</button>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard" class="panel" style="display:none;">
+    <p id="userInfo"></p>
+    <div class="tabs">
+        <button onclick="showMainTab('users')">Users</button>
+        <button onclick="showMainTab('moderation')">Moderation</button>
+        <button onclick="logout()">Logout</button>
+    </div>
+</div>
+
+<!-- USERS TAB -->
+<div id="usersTab" class="panel" style="display:none;">
+    <h2>Users</h2>
+    <div class="tabs">
+        <button onclick="filterUsers('Admin')">Admins</button>
+        <button onclick="filterUsers('Moderator')">Moderators</button>
+        <button onclick="filterUsers('Staff')">Users</button>
+        <button onclick="filterUsers('Banned')">Banned</button>
+    </div>
+    <table>
+        <thead>
+            <tr><th>Username</th><th>Role</th></tr>
+        </thead>
+        <tbody id="usersList"></tbody>
+    </table>
+</div>
+
+<!-- MODERATION TAB -->
+<div id="moderationTab" class="panel" style="display:none;">
+    <h2>Moderation</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>User</th>
+                <th>Role</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="modList"></tbody>
+    </table>
+</div>
+
+<script>
+let users = JSON.parse(localStorage.getItem("users")) || [
+    { username: "admin", password: "admin", role: "Admin" }
+];
+let currentUser = JSON.parse(localStorage.getItem("currentUser"));
+
+function save() {
+    localStorage.setItem("users", JSON.stringify(users));
+}
+
+function register() {
+    if (!regUser.value || !regPass.value) return alert("Fill all fields");
+    if (users.some(u => u.username === regUser.value)) return alert("User exists");
+    users.push({ username: regUser.value, password: regPass.value, role: "Staff" });
+    save();
+    alert("Registered");
+}
+
+function login() {
+    const user = users.find(u =>
+        u.username === loginUser.value &&
+        u.password === loginPass.value
+    );
+    if (!user) return alert("Invalid credentials");
+    if (user.role === "Banned") return alert("You are banned");
+
+    currentUser = user;
+    localStorage.setItem("currentUser", JSON.stringify(user));
+    initDashboard();
+}
+
+function logout() {
+    localStorage.removeItem("currentUser");
+    location.reload();
+}
+
+function initDashboard() {
+    auth.style.display = "none";
+    dashboard.style.display = "block";
+    userInfo.textContent = `Logged in as ${currentUser.username} (${currentUser.role})`;
+    showMainTab("users");
+}
+
+function showMainTab(tab) {
+    usersTab.style.display = tab === "users" ? "block" : "none";
+    moderationTab.style.display = tab === "moderation" ? "block" : "none";
+
+    if (tab === "users") filterUsers("Staff");
+    if (tab === "moderation") loadModeration();
+}
+
+function filterUsers(role) {
+    usersList.innerHTML = "";
+    users.filter(u => u.role === role).forEach(u => {
+        usersList.innerHTML += `
+            <tr><td>${u.username}</td><td>${u.role}</td></tr>
+        `;
+    });
+}
+
+function loadModeration() {
+    modList.innerHTML = "";
+    users.forEach((u, i) => {
+        if (u.username === currentUser.username) return;
+
+        let actions = `<button onclick="kick(${i})">Kick</button>`;
+
+        if (currentUser.role === "Admin") {
+            actions += `
+                <button onclick="ban(${i})">Ban</button>
+                <select onchange="setRole(${i}, this.value)">
+                    <option ${u.role=="Staff"?"selected":""}>Staff</option>
+                    <option ${u.role=="Moderator"?"selected":""}>Moderator</option>
+                    <option ${u.role=="Admin"?"selected":""}>Admin</option>
+                </select>
+            `;
+        }
+
+        if (u.role === "Banned" && currentUser.role === "Admin") {
+            actions = `<button onclick="unban(${i})">Unban</button>`;
+        }
+
+        modList.innerHTML += `
+            <tr>
+                <td>${u.username}</td>
+                <td>${u.role}</td>
+                <td>${actions}</td>
+            </tr>
+        `;
+    });
+}
+
+function kick(i) {
+    alert(users[i].username + " was kicked");
+}
+
+function ban(i) {
+    users[i].role = "Banned";
+    save();
+    loadModeration();
+}
+
+function unban(i) {
+    users[i].role = "Staff";
+    save();
+    loadModeration();
+}
+
+function setRole(i, role) {
+    users[i].role = role;
+    save();
+    loadModeration();
+}
+
+if (currentUser) initDashboard();
+</script>
+
+</body>
+</html>
