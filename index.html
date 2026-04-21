@@ -98,14 +98,15 @@ li {
 <script>
 /* ================= FIREBASE CONFIG ================= */
 /* 🔴 REPLACE WITH YOUR REAL CONFIG FROM FIREBASE */
-firebase.initializeApp({
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
-});
+const firebaseConfig = {
+  apiKey: "AIzaSyCROUwb_jRNjHospqu86fvL9P4ajCe94c8",
+  authDomain: "barthiiny.firebaseapp.com",
+  projectId: "barthiiny",
+  storageBucket: "barthiiny.firebasestorage.app",
+  messagingSenderId: "496508474938",
+  appId: "1:496508474938:web:3eae7b5b67fbcb77af8703",
+  measurementId: "G-8ZZMBT7913"
+};
 
 const auth = firebase.auth();
 const db = firebase.firestore();
