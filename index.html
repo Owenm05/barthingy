@@ -130,10 +130,21 @@ function register() {
     .catch(err => alert(err.message));
 }
 
+<script>
 function login() {
+  authStatus.textContent = "Logging in...";
+
   auth.signInWithEmailAndPassword(email.value, password.value)
-    .catch(err => alert(err.message));
+    .then(() => {
+      authStatus.textContent = "Login successful ✅";
+    })
+    .catch(err => {
+      authStatus.textContent = "Error: " + err.message;
+      console.error(err);
+    });
 }
+</script>
+
 
 function logout() {
   auth.signOut();
