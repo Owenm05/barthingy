@@ -37,7 +37,7 @@ button {
 
 <h1>🔥 Firebase Auth Test</h1>
 
-<div class="panel" id="auth">
+<div class="panel" id="authPanel">
   <input id="email" placeholder="Email">
   <input id="password" type="password" placeholder="Password">
   <input id="username" placeholder="Username (register only)">
@@ -113,11 +113,11 @@ auth.onAuthStateChanged(user => {
   console.log("Auth state changed:", user);
 
   if (user) {
-    auth.style.display = "none";
+    authPanel.style.display = "none";
     app.style.display = "block";
     userInfo.textContent = "Logged in as " + user.email;
   } else {
-    auth.style.display = "block";
+    authPanel.style.display = "block";
     app.style.display = "none";
   }
 });
