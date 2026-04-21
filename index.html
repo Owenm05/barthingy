@@ -10,18 +10,8 @@ body {
     color: #eee;
     padding: 20px;
 }
-h1, h2 {
+h1, h2, h3 {
     color: #f4c430;
-}
-input, button, select {
-    padding: 8px;
-    margin: 5px 0;
-    width: 100%;
-}
-button {
-    background: #f4c430;
-    border: none;
-    cursor: pointer;
 }
 .panel {
     background: #333;
@@ -30,18 +20,27 @@ button {
     max-width: 900px;
     margin-bottom: 20px;
 }
+input, select, button {
+    padding: 8px;
+    width: 100%;
+    margin: 5px 0;
+}
+button {
+    background: #f4c430;
+    border: none;
+    cursor: pointer;
+}
 .tabs button {
     width: auto;
     margin-right: 5px;
 }
-table {
-    width: 100%;
-    border-collapse: collapse;
+ul {
+    list-style: none;
+    padding: 0;
 }
-th, td {
-    border: 1px solid #444;
-    padding: 8px;
-    text-align: center;
+li {
+    padding: 6px;
+    border-bottom: 1px solid #444;
 }
 </style>
 </head>
@@ -51,236 +50,212 @@ th, td {
 
 <!-- AUTH -->
 <div id="auth" class="panel">
-    <h2>Login</h2>
-    <input id="loginUser" placeholder="Username">
-    <input id="loginPass" type="password">
-    <button onclick="login()">Login</button>
-
-    <h2>Register</h2>
-    <input id="regUser" placeholder="Username">
-    <input id="regPass" type="password">
+    <h2>Login / Register</h2>
+    <input id="email" placeholder="Email">
+    <input id="password" type="password" placeholder="Password">
+    <input id="username" placeholder="Username (register only)">
     <button onclick="register()">Register</button>
+    <button onclick="login()">Login</button>
 </div>
 
-<!-- DASHBOARD -->
-<div id="dashboard" class="panel" style="display:none;">
+<!-- APP -->
+<div id="app" class="panel" style="display:none;">
     <p id="userInfo"></p>
+
     <div class="tabs">
-        <button onclick="showTab('users')">Users</button>
-        <button onclick="showTab('moderation')">Moderation</button>
+        <button onclick="showTab('bars')">Bars</button>
         <button onclick="showTab('invites')">Invites</button>
         <button onclick="logout()">Logout</button>
     </div>
+
+    <!-- BARS TAB -->
+    <div id="barsTab">
+        <h3>Your Bars</h3>
+        <ul id="barList"></ul>
+
+        <h3>Create New Bar</h3>
+        <input id="newBarName" placeholder="Bar name">
+        <button onclick="createBar()">Create Bar</button>
+    </div>
+
+    <!-- INVITES TAB -->
+    <div id="invitesTab" style="display:none;">
+        <h3>Send Invite</h3>
+        <input id="inviteUsername" placeholder="Username to invite">
+        <select id="inviteBar"></select>
+        <button onclick="sendInvite()">Send Invite</button>
+
+        <h3>Your Invites</h3>
+        <ul id="inviteList"></ul>
+    </div>
 </div>
 
-<!-- USERS TAB -->
-<div id="usersTab" class="panel" style="display:none;">
-    <h2>Registered Users</h2>
-    <table>
-        <thead><tr><th>Username</th><th>Role</th></tr></thead>
-        <tbody id="usersList"></tbody>
-    </table>
-</div>
-
-<!-- MODERATION TAB -->
-<div id="moderationTab" class="panel" style="display:none;">
-    <h2>Moderation</h2>
-
-    <input id="inviteUser" placeholder="Invite existing user by username">
-    <button onclick="sendInvite()">Send Invite</button>
-
-    <table>
-        <thead><tr><th>User</th><th>Role</th><th>Actions</th></tr></thead>
-        <tbody id="modList"></tbody>
-    </table>
-</div>
-
-<!-- INVITES TAB -->
-<div id="invitesTab" class="panel" style="display:none;">
-    <h2>Your Invites</h2>
-    <table>
-        <thead><tr><th>Bar</th><th>Action</th></tr></thead>
-        <tbody id="inviteList"></tbody>
-    </table>
-</div>
+<!-- FIREBASE SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <script>
-/* ===== DATA ===== */
+/* ================= FIREBASE CONFIG ================= */
+/* 🔴 REPLACE WITH YOUR REAL CONFIG FROM FIREBASE */
+firebase.initializeApp({
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+});
 
-let users = JSON.parse(localStorage.getItem("users")) || [
-    { username: "admin", password: "admin", role: "Admin" }
-];
+const auth = firebase.auth();
+const db = firebase.firestore();
 
-let bars = JSON.parse(localStorage.getItem("bars")) || [
-    { id: "main-bar", name: "Main Bar", members: ["admin"] }
-];
+/* ================= STATE ================= */
 
-let invites = JSON.parse(localStorage.getItem("invites")) || {};
-let currentUser = JSON.parse(localStorage.getItem("currentUser"));
+let currentUser = null;
+let currentUsername = null;
 
-function save() {
-    localStorage.setItem("users", JSON.stringify(users));
-    localStorage.setItem("bars", JSON.stringify(bars));
-    localStorage.setItem("invites", JSON.stringify(invites));
-}
-
-/* ===== AUTH ===== */
+/* ================= AUTH ================= */
 
 function register() {
-    if (!regUser.value || !regPass.value) return alert("Fill all fields");
-    if (users.some(u => u.username === regUser.value)) return alert("User exists");
+    if (!email.value || !password.value || !username.value) {
+        alert("Fill all fields");
+        return;
+    }
 
-    users.push({ username: regUser.value, password: regPass.value, role: "Staff" });
-    save();
-    alert("Registered successfully");
+    auth.createUserWithEmailAndPassword(email.value, password.value)
+        .then(cred => {
+            return db.collection("users").doc(cred.user.uid).set({
+                username: username.value
+            });
+        })
+        .catch(err => alert(err.message));
 }
 
 function login() {
-    const user = users.find(
-        u => u.username === loginUser.value && u.password === loginPass.value
-    );
-    if (!user) return alert("Invalid login");
-    if (user.role === "Banned") return alert("You are banned");
-
-    currentUser = user;
-    localStorage.setItem("currentUser", JSON.stringify(user));
-    init();
+    auth.signInWithEmailAndPassword(email.value, password.value)
+        .catch(err => alert(err.message));
 }
 
 function logout() {
-    localStorage.removeItem("currentUser");
-    location.reload();
+    auth.signOut();
 }
 
-/* ===== UI ===== */
+auth.onAuthStateChanged(async user => {
+    if (!user) {
+        authDiv(true);
+        return;
+    }
 
-function init() {
-    auth.style.display = "none";
-    dashboard.style.display = "block";
-    userInfo.textContent = `Logged in as ${currentUser.username} (${currentUser.role})`;
-    showTab("users");
+    currentUser = user;
+    const snap = await db.collection("users").doc(user.uid).get();
+    currentUsername = snap.data().username;
+
+    userInfo.textContent = `Logged in as ${currentUsername}`;
+    authDiv(false);
+
+    loadBars();
+    loadInvites();
+});
+
+/* ================= UI ================= */
+
+function authDiv(showAuth) {
+    auth.style.display = showAuth ? "block" : "none";
+    app.style.display = showAuth ? "none" : "block";
 }
 
 function showTab(tab) {
-    usersTab.style.display = tab === "users" ? "block" : "none";
-    moderationTab.style.display = tab === "moderation" ? "block" : "none";
+    barsTab.style.display = tab === "bars" ? "block" : "none";
     invitesTab.style.display = tab === "invites" ? "block" : "none";
-
-    if (tab === "users") loadUsers();
-    if (tab === "moderation") loadModeration();
-    if (tab === "invites") loadInvites();
 }
 
-/* ===== USERS ===== */
+/* ================= BARS ================= */
 
-function loadUsers() {
-    usersList.innerHTML = "";
-    users.forEach(u => {
-        usersList.innerHTML += `<tr><td>${u.username}</td><td>${u.role}</td></tr>`;
+function createBar() {
+    if (!newBarName.value) return alert("Enter bar name");
+
+    db.collection("bars").add({
+        name: newBarName.value,
+        members: [currentUser.uid]
+    });
+
+    newBarName.value = "";
+}
+
+function loadBars() {
+    barList.innerHTML = "";
+    inviteBar.innerHTML = "";
+
+    db.collection("bars").onSnapshot(snapshot => {
+        barList.innerHTML = "";
+        inviteBar.innerHTML = "";
+
+        snapshot.forEach(doc => {
+            const bar = doc.data();
+            if (bar.members.includes(currentUser.uid)) {
+                barList.innerHTML += `<li>${bar.name}</li>`;
+                inviteBar.innerHTML += `<option value="${doc.id}">${bar.name}</option>`;
+            }
+        });
     });
 }
 
-/* ===== MODERATION ===== */
+/* ================= INVITES ================= */
 
-function loadModeration() {
-    modList.innerHTML = "";
-    users.forEach((u, i) => {
-        if (u.username === currentUser.username) return;
+async function sendInvite() {
+    if (!inviteUsername.value) return alert("Enter a username");
 
-        let actions = `<button onclick="kick(${i})">Kick</button>`;
+    // Check user exists
+    const usersSnap = await db.collection("users")
+        .where("username", "==", inviteUsername.value)
+        .get();
 
-        if (currentUser.role === "Admin") {
-            actions += `
-                <button onclick="ban(${i})">Ban</button>
-                <select onchange="setRole(${i}, this.value)">
-                    <option value="Staff">Staff</option>
-                    <option value="Moderator">Moderator</option>
-                    <option value="Admin">Admin</option>
-                </select>
-            `;
-        }
+    if (usersSnap.empty) {
+        alert("User not found");
+        return;
+    }
 
-        modList.innerHTML += `
-            <tr>
-                <td>${u.username}</td>
-                <td>${u.role}</td>
-                <td>${actions}</td>
-            </tr>
-        `;
+    db.collection("invites").add({
+        toUsername: inviteUsername.value,
+        barId: inviteBar.value,
+        from: currentUsername
     });
-}
 
-function kick(i) {
-    alert(users[i].username + " was kicked");
-}
-
-function ban(i) {
-    users[i].role = "Banned";
-    save();
-    loadModeration();
-}
-
-function setRole(i, role) {
-    users[i].role = role;
-    save();
-    loadModeration();
-}
-
-/* ===== INVITES ===== */
-
-function sendInvite() {
-    const name = inviteUser.value.trim();
-
-    const exists = users.some(u => u.username === name);
-    if (!exists) return alert("User does not exist");
-
-    invites[name] = invites[name] || [];
-    if (invites[name].includes("main-bar")) return alert("Already invited");
-
-    invites[name].push("main-bar");
-    save();
+    inviteUsername.value = "";
     alert("Invite sent");
 }
 
 function loadInvites() {
     inviteList.innerHTML = "";
-    const list = invites[currentUser.username] || [];
 
-    if (!list.length) {
-        inviteList.innerHTML = `<tr><td colspan="2">No invites</td></tr>`;
-        return;
-    }
+    db.collection("invites")
+        .where("toUsername", "==", currentUsername)
+        .onSnapshot(snapshot => {
+            inviteList.innerHTML = "";
+            snapshot.forEach(doc => {
+                const inv = doc.data();
+                inviteList.innerHTML += `
+                    <li>
+                        Invite to bar: ${inv.barId}
+                        <button onclick="acceptInvite('${doc.id}','${inv.barId}')">Accept</button>
+                        <button onclick="declineInvite('${doc.id}')">Decline</button>
+                    </li>
+                `;
+            });
+        });
+}
 
-    list.forEach(barId => {
-        inviteList.innerHTML += `
-            <tr>
-                <td>Main Bar</td>
-                <td>
-                    <button onclick="acceptInvite('${barId}')">Accept</button>
-                    <button onclick="declineInvite('${barId}')">Decline</button>
-                </td>
-            </tr>
-        `;
+function acceptInvite(inviteId, barId) {
+    db.collection("bars").doc(barId).update({
+        members: firebase.firestore.FieldValue.arrayUnion(currentUser.uid)
     });
+    db.collection("invites").doc(inviteId).delete();
 }
 
-function acceptInvite(barId) {
-    const bar = bars.find(b => b.id === barId);
-    bar.members.push(currentUser.username);
-    invites[currentUser.username] =
-        invites[currentUser.username].filter(i => i !== barId);
-    save();
-    loadInvites();
+function declineInvite(inviteId) {
+    db.collection("invites").doc(inviteId).delete();
 }
-
-function declineInvite(barId) {
-    invites[currentUser.username] =
-        invites[currentUser.username].filter(i => i !== barId);
-    save();
-    loadInvites();
-}
-
-if (currentUser) init();
 </script>
 
 </body>
