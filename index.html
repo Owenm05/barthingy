@@ -157,6 +157,7 @@ let currentUsername;
 
 auth.onAuthStateChanged(async user => {
   if (!user) {
+    console.log("Auth state changed:", user);
     auth.style.display = "block";
     app.style.display = "none";
     return;
