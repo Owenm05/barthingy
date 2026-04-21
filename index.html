@@ -4,49 +4,49 @@
 <meta charset="UTF-8">
 <title>Bar Management System</title>
 <style>
-    body {
-        font-family: Arial, sans-serif;
-        background: #1f1f1f;
-        color: #eee;
-        padding: 20px;
-    }
-    h1, h2 {
-        color: #f4c430;
-    }
-    input, button, select {
-        padding: 8px;
-        margin: 5px 0;
-        width: 100%;
-    }
-    button {
-        background: #f4c430;
-        border: none;
-        cursor: pointer;
-    }
-    button:hover {
-        background: #d9aa1e;
-    }
-    .panel {
-        background: #333;
-        padding: 20px;
-        border-radius: 8px;
-        max-width: 700px;
-        margin-bottom: 20px;
-    }
-    .tabs button {
-        width: auto;
-        margin-right: 5px;
-    }
-    table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 10px;
-    }
-    th, td {
-        border: 1px solid #444;
-        padding: 8px;
-        text-align: center;
-    }
+body {
+    font-family: Arial, sans-serif;
+    background: #1f1f1f;
+    color: #eee;
+    padding: 20px;
+}
+h1, h2 {
+    color: #f4c430;
+}
+input, button, select {
+    padding: 8px;
+    margin: 5px 0;
+    width: 100%;
+}
+button {
+    background: #f4c430;
+    border: none;
+    cursor: pointer;
+}
+button:hover {
+    background: #d9aa1e;
+}
+.panel {
+    background: #333;
+    padding: 20px;
+    border-radius: 8px;
+    max-width: 800px;
+    margin-bottom: 20px;
+}
+.tabs button {
+    width: auto;
+    margin-right: 5px;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+th, td {
+    border: 1px solid #444;
+    padding: 8px;
+    text-align: center;
+}
 </style>
 </head>
 <body>
@@ -70,8 +70,9 @@
 <div id="dashboard" class="panel" style="display:none;">
     <p id="userInfo"></p>
     <div class="tabs">
-        <button onclick="showMainTab('users')">Users</button>
-        <button onclick="showMainTab('moderation')">Moderation</button>
+        <button onclick="showTab('users')">Users</button>
+        <button onclick="showTab('moderation')">Moderation</button>
+        <button onclick="showTab('invites')">Invites</button>
         <button onclick="logout()">Logout</button>
     </div>
 </div>
@@ -96,10 +97,14 @@
 <!-- MODERATION TAB -->
 <div id="moderationTab" class="panel" style="display:none;">
     <h2>Moderation</h2>
+
+    <input id="inviteUser" placeholder="Invite user by username">
+    <button onclick="sendInvite()">Send Invite</button>
+
     <table>
         <thead>
             <tr>
-                <th>User</th>
+                <th>Username</th>
                 <th>Role</th>
                 <th>Actions</th>
             </tr>
@@ -108,21 +113,49 @@
     </table>
 </div>
 
+<!-- INVITES TAB -->
+<div id="invitesTab" class="panel" style="display:none;">
+    <h2>Your Bar Invites</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Bar</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="inviteList"></tbody>
+    </table>
+</div>
+
 <script>
+/* ================= DATA ================= */
+
 let users = JSON.parse(localStorage.getItem("users")) || [
     { username: "admin", password: "admin", role: "Admin" }
 ];
+
+let bars = JSON.parse(localStorage.getItem("bars")) || [
+    { id: "main-bar", name: "The Main Bar", members: ["admin"] }
+];
+
+let invites = JSON.parse(localStorage.getItem("invites")) || {};
 let currentUser = JSON.parse(localStorage.getItem("currentUser"));
 
-function save() {
+/* ================= UTIL ================= */
+
+function saveAll() {
     localStorage.setItem("users", JSON.stringify(users));
+    localStorage.setItem("bars", JSON.stringify(bars));
+    localStorage.setItem("invites", JSON.stringify(invites));
 }
+
+/* ================= AUTH ================= */
 
 function register() {
     if (!regUser.value || !regPass.value) return alert("Fill all fields");
     if (users.some(u => u.username === regUser.value)) return alert("User exists");
     users.push({ username: regUser.value, password: regPass.value, role: "Staff" });
-    save();
+    saveAll();
     alert("Registered");
 }
 
@@ -131,12 +164,11 @@ function login() {
         u.username === loginUser.value &&
         u.password === loginPass.value
     );
-    if (!user) return alert("Invalid credentials");
+    if (!user) return alert("Invalid login");
     if (user.role === "Banned") return alert("You are banned");
-
     currentUser = user;
     localStorage.setItem("currentUser", JSON.stringify(user));
-    initDashboard();
+    init();
 }
 
 function logout() {
@@ -144,29 +176,37 @@ function logout() {
     location.reload();
 }
 
-function initDashboard() {
+/* ================= INITIALIZE ================= */
+
+function init() {
     auth.style.display = "none";
     dashboard.style.display = "block";
     userInfo.textContent = `Logged in as ${currentUser.username} (${currentUser.role})`;
-    showMainTab("users");
+    showTab("users");
 }
 
-function showMainTab(tab) {
+/* ================= TABS ================= */
+
+function showTab(tab) {
     usersTab.style.display = tab === "users" ? "block" : "none";
     moderationTab.style.display = tab === "moderation" ? "block" : "none";
+    invitesTab.style.display = tab === "invites" ? "block" : "none";
 
     if (tab === "users") filterUsers("Staff");
     if (tab === "moderation") loadModeration();
+    if (tab === "invites") loadInvites();
 }
+
+/* ================= USERS ================= */
 
 function filterUsers(role) {
     usersList.innerHTML = "";
     users.filter(u => u.role === role).forEach(u => {
-        usersList.innerHTML += `
-            <tr><td>${u.username}</td><td>${u.role}</td></tr>
-        `;
+        usersList.innerHTML += `<tr><td>${u.username}</td><td>${u.role}</td></tr>`;
     });
 }
+
+/* ================= MODERATION ================= */
 
 function loadModeration() {
     modList.innerHTML = "";
@@ -179,9 +219,9 @@ function loadModeration() {
             actions += `
                 <button onclick="ban(${i})">Ban</button>
                 <select onchange="setRole(${i}, this.value)">
-                    <option ${u.role=="Staff"?"selected":""}>Staff</option>
-                    <option ${u.role=="Moderator"?"selected":""}>Moderator</option>
-                    <option ${u.role=="Admin"?"selected":""}>Admin</option>
+                    <option ${u.role==="Staff"?"selected":""}>Staff</option>
+                    <option ${u.role==="Moderator"?"selected":""}>Moderator</option>
+                    <option ${u.role==="Admin"?"selected":""}>Admin</option>
                 </select>
             `;
         }
@@ -206,24 +246,84 @@ function kick(i) {
 
 function ban(i) {
     users[i].role = "Banned";
-    save();
+    saveAll();
     loadModeration();
 }
 
 function unban(i) {
     users[i].role = "Staff";
-    save();
+    saveAll();
     loadModeration();
 }
 
 function setRole(i, role) {
     users[i].role = role;
-    save();
+    saveAll();
     loadModeration();
 }
 
-if (currentUser) initDashboard();
+/* ================= INVITES ================= */
+
+function sendInvite() {
+    const username = inviteUser.value;
+    if (!username) return alert("Enter a username");
+    if (!users.find(u => u.username === username)) return alert("User not found");
+
+    invites[username] = invites[username] || [];
+    if (invites[username].includes("main-bar")) return alert("Already invited");
+
+    invites[username].push("main-bar");
+    saveAll();
+    alert("Invite sent");
+}
+
+function loadInvites() {
+    inviteList.innerHTML = "";
+    const list = invites[currentUser.username] || [];
+
+    if (list.length === 0) {
+        inviteList.innerHTML = `<tr><td colspan="2">No invites</td></tr>`;
+        return;
+    }
+
+    list.forEach(barId => {
+        const bar = bars.find(b => b.id === barId);
+        inviteList.innerHTML += `
+            <tr>
+                <td>${bar.name}</td>
+                <td>
+                    <button onclick="acceptInvite('${barId}')">Accept</button>
+                    <button onclick="declineInvite('${barId}')">Decline</button>
+                </td>
+            </tr>
+        `;
+    });
+}
+
+function acceptInvite(barId) {
+    const bar = bars.find(b => b.id === barId);
+    if (!bar.members.includes(currentUser.username)) {
+        bar.members.push(currentUser.username);
+    }
+    invites[currentUser.username] =
+        invites[currentUser.username].filter(i => i !== barId);
+    saveAll();
+    loadInvites();
+    alert("Joined the bar!");
+}
+
+function declineInvite(barId) {
+    invites[currentUser.username] =
+        invites[currentUser.username].filter(i => i !== barId);
+    saveAll();
+    loadInvites();
+}
+
+/* ================= AUTO LOGIN ================= */
+
+if (currentUser) init();
 </script>
 
 </body>
 </html>
+``
