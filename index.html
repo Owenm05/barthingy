@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Firebase Login Test</title>
+<title>Bar Management</title>
 
 <style>
 body {
@@ -15,11 +15,12 @@ body {
   background: #333;
   padding: 20px;
   border-radius: 8px;
-  max-width: 400px;
+  max-width: 900px;
+  margin-bottom: 20px;
 }
-input, button {
-  width: 100%;
+input, select, button {
   padding: 8px;
+  width: 100%;
   margin: 6px 0;
 }
 button {
@@ -27,17 +28,27 @@ button {
   border: none;
   cursor: pointer;
 }
-#authStatus {
-  margin-top: 10px;
-  color: #ccc;
+.tabs button {
+  width: auto;
+  margin-right: 6px;
+}
+ul {
+  list-style: none;
+  padding: 0;
+}
+li {
+  padding: 6px;
+  border-bottom: 1px solid #444;
 }
 </style>
 </head>
 <body>
 
-<h1>🔥 Firebase Auth Test</h1>
+<h1>🍺 Bar Management System</h1>
 
-<div class="panel" id="authPanel">
+<!-- AUTH PANEL -->
+<div id="authPanel" class="panel">
+  <h2>Login / Register</h2>
   <input id="email" placeholder="Email">
   <input id="password" type="password" placeholder="Password">
   <input id="username" placeholder="Username (register only)">
@@ -46,20 +57,47 @@ button {
   <p id="authStatus"></p>
 </div>
 
-<div class="panel" id="app" style="display:none;">
+<!-- APP PANEL -->
+<div id="appPanel" class="panel" style="display:none;">
   <p id="userInfo"></p>
-  <button onclick="logout()">Logout</button>
+
+  <div class="tabs">
+    <button onclick="showTab('bars')">Bars</button>
+    <button onclick="showTab('invites')">Invites</button>
+    <button onclick="logout()">Logout</button>
+  </div>
+
+  <!-- BARS TAB -->
+  <div id="barsTab">
+    <h3>Your Bars</h3>
+    <ul id="barList"></ul>
+
+    <h3>Create Bar</h3>
+    <input id="newBarName" placeholder="Bar name">
+    <button onclick="createBar()">Create Bar</button>
+  </div>
+
+  <!-- INVITES TAB -->
+  <div id="invitesTab" style="display:none;">
+    <h3>Send Invite</h3>
+    <input id="inviteUsername" placeholder="Username">
+    <select id="inviteBar"></select>
+    <button onclick="sendInvite()">Send Invite</button>
+
+    <h3>Your Invites</h3>
+    <ul id="inviteList"></ul>
+  </div>
 </div>
 
-<!-- ✅✅✅ FIREBASE SDKs (CORRECT AND REQUIRED) ✅✅✅ -->
+<!-- ✅ Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <script>
-/* 🔴 REPLACE WITH YOUR REAL FIREBASE CONFIG */
+/* 🔴 REPLACE WITH YOUR FIREBASE CONFIG */
 firebase.initializeApp({
-  apiKey: "AIzaSyCROUwb_jRNjHospqu86fvL9P4ajCe94c8",
+ apiKey: "AIzaSyCROUwb_jRNjHospqu86fvL9P4ajCe94c8",
   authDomain: "barthiiny.firebaseapp.com",
   projectId: "barthiiny",
   storageBucket: "barthiiny.firebasestorage.app",
@@ -68,60 +106,154 @@ firebase.initializeApp({
   measurementId: "G-8ZZMBT7913"
 });
 
-/* ✅ Firebase initialized */
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-/* ===== REGISTER ===== */
+/* ===== AUTH ===== */
+
 function register() {
-  authStatus.textContent = "Registering...";
+  if (!email.value || !password.value || !username.value) {
+    authStatus.textContent = "Fill all fields";
+    return;
+  }
+
   auth.createUserWithEmailAndPassword(email.value, password.value)
     .then(cred => {
       return db.collection("users").doc(cred.user.uid).set({
         username: username.value
       });
     })
-    .then(() => {
-      authStatus.textContent = "Registered successfully ✅";
-    })
-    .catch(err => {
-      authStatus.textContent = err.message;
-      console.error(err);
-    });
+    .then(() => authStatus.textContent = "Registered ✅")
+    .catch(err => authStatus.textContent = err.message);
 }
 
-/* ===== LOGIN ===== */
 function login() {
   authStatus.textContent = "Logging in...";
   auth.signInWithEmailAndPassword(email.value, password.value)
-    .then(() => {
-      authStatus.textContent = "Login successful ✅";
-    })
-    .catch(err => {
-      authStatus.textContent = err.message;
-      console.error(err);
-    });
+    .catch(err => authStatus.textContent = err.message);
 }
 
-/* ===== LOGOUT ===== */
 function logout() {
   auth.signOut();
 }
 
-/* ===== AUTH STATE ===== */
-auth.onAuthStateChanged(user => {
-  console.log("Auth state changed:", user);
+/* ===== STATE ===== */
 
-  if (user) {
-    authPanel.style.display = "none";
-    app.style.display = "block";
-    userInfo.textContent = "Logged in as " + user.email;
-  } else {
+let currentUser;
+let currentUsername;
+
+auth.onAuthStateChanged(async user => {
+  if (!user) {
     authPanel.style.display = "block";
-    app.style.display = "none";
+    appPanel.style.display = "none";
+    return;
   }
+
+  currentUser = user;
+
+  const snap = await db.collection("users").doc(user.uid).get();
+  currentUsername = snap.data().username;
+
+  authPanel.style.display = "none";
+  appPanel.style.display = "block";
+  userInfo.textContent = "Logged in as " + currentUsername;
+
+  loadBars();
+  loadInvites();
 });
+
+/* ===== UI ===== */
+
+function showTab(tab) {
+  barsTab.style.display = tab === "bars" ? "block" : "none";
+  invitesTab.style.display = tab === "invites" ? "block" : "none";
+}
+
+/* ===== BARS ===== */
+
+function createBar() {
+  if (!newBarName.value) return;
+
+  db.collection("bars").add({
+    name: newBarName.value,
+    members: [currentUser.uid]
+  });
+
+  newBarName.value = "";
+}
+
+function loadBars() {
+  barList.innerHTML = "";
+  inviteBar.innerHTML = "";
+
+  db.collection("bars").onSnapshot(snapshot => {
+    barList.innerHTML = "";
+    inviteBar.innerHTML = "";
+
+    snapshot.forEach(doc => {
+      const bar = doc.data();
+      if (bar.members.includes(currentUser.uid)) {
+        barList.innerHTML += `<li>${bar.name}</li>`;
+        inviteBar.innerHTML += `<option value="${doc.id}">${bar.name}</option>`;
+      }
+    });
+  });
+}
+
+/* ===== INVITES ===== */
+
+async function sendInvite() {
+  if (!inviteUsername.value || !inviteBar.value) return;
+
+  const userSnap = await db.collection("users")
+    .where("username", "==", inviteUsername.value)
+    .get();
+
+  if (userSnap.empty) {
+    alert("User not found");
+    return;
+  }
+
+  db.collection("invites").add({
+    toUsername: inviteUsername.value,
+    barId: inviteBar.value
+  });
+
+  inviteUsername.value = "";
+  alert("Invite sent ✅");
+}
+
+function loadInvites() {
+  inviteList.innerHTML = "";
+
+  db.collection("invites")
+    .where("toUsername", "==", currentUsername)
+    .onSnapshot(snapshot => {
+      inviteList.innerHTML = "";
+      snapshot.forEach(doc => {
+        inviteList.innerHTML += `
+          <li>
+            Invite received
+            <button onclick="acceptInvite('${doc.id}','${doc.data().barId}')">Accept</button>
+            <button onclick="declineInvite('${doc.id}')">Decline</button>
+          </li>
+        `;
+      });
+    });
+}
+
+function acceptInvite(inviteId, barId) {
+  db.collection("bars").doc(barId).update({
+    members: firebase.firestore.FieldValue.arrayUnion(currentUser.uid)
+  });
+  db.collection("invites").doc(inviteId).delete();
+}
+
+function declineInvite(inviteId) {
+  db.collection("invites").doc(inviteId).delete();
+}
 </script>
 
 </body>
 </html>
+``
