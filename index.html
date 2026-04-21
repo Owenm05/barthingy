@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Bar Management System</title>
+<title>Bar Management + Scheduling</title>
 
 <style>
 body {
@@ -15,13 +15,13 @@ body {
   background: #333;
   padding: 20px;
   border-radius: 8px;
-  max-width: 1100px;
+  max-width: 1200px;
   margin-bottom: 20px;
 }
 input, select, button {
   padding: 8px;
   width: 100%;
-  margin: 6px 0;
+  margin: 5px 0;
 }
 button {
   background: #f4c430;
@@ -45,7 +45,7 @@ td, th {
 </head>
 <body>
 
-<h1>🍺 Bar Management System</h1>
+<h1>🍺 Bar Management & Scheduling</h1>
 
 <!-- AUTH -->
 <div id="authPanel" class="panel">
@@ -63,7 +63,7 @@ td, th {
 
   <div class="tabs">
     <button onclick="showTab('bars')">Bars</button>
-    <button onclick="showTab('invites')">Invites</button>
+    <button onclick="showTab('schedule')">Schedule</button>
     <button onclick="logout()">Logout</button>
   </div>
 
@@ -71,43 +71,52 @@ td, th {
   <div id="barsTab">
     <h3>Your Bars</h3>
     <ul id="barList"></ul>
-
-    <h3>Create Bar</h3>
-    <input id="newBarName" placeholder="Bar name">
-    <button onclick="createBar()">Create</button>
-
-    <div id="barAdmin" style="display:none;">
-      <h3>Moderation</h3>
-      <table>
-        <thead>
-          <tr><th>User</th><th>Role</th><th>Actions</th></tr>
-        </thead>
-        <tbody id="memberTable"></tbody>
-      </table>
-    </div>
+    <input id="newBarName" placeholder="New bar name">
+    <button onclick="createBar()">Create Bar</button>
   </div>
 
-  <!-- INVITES -->
-  <div id="invitesTab" style="display:none;">
-    <h3>Send Invite</h3>
-    <input id="inviteUsername" placeholder="Username">
-    <select id="inviteBar"></select>
-    <button onclick="sendInvite()">Invite</button>
+  <!-- SCHEDULE -->
+  <div id="scheduleTab" style="display:none;">
+    <h3>Schedule Shifts</h3>
 
-    <h3>Your Invites</h3>
-    <ul id="inviteList"></ul>
+    <select id="scheduleUser"></select>
+
+    <label>
+      <input type="checkbox" value="Bartender" class="roleCheck"> Bartender
+    </label>
+    <label>
+      <input type="checkbox" value="Security" class="roleCheck"> Security
+    </label>
+
+    <input type="date" id="scheduleDate">
+    <input type="time" id="startTime">
+    <input type="time" id="endTime">
+
+    <button onclick="createSchedule()">Assign Shift</button>
+
+    <h3>Upcoming Shifts</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Roles</th>
+          <th>Date</th>
+          <th>Time</th>
+        </tr>
+      </thead>
+      <tbody id="scheduleTable"></tbody>
+    </table>
   </div>
 </div>
 
-<!-- FIREBASE -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<!-- FIREBASE SDKs -->
+https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.jsscript>
+https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js
+https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js>
 
 <script>
-/* 🔴 PUT YOUR FIREBASE CONFIG HERE */
 firebase.initializeApp({
-  apiKey: "AIzaSyCROUwb_jRNjHospqu86fvL9P4ajCe94c8",
+ apiKey: "AIzaSyCROUwb_jRNjHospqu86fvL9P4ajCe94c8",
   authDomain: "barthiiny.firebaseapp.com",
   projectId: "barthiiny",
   storageBucket: "barthiiny.firebasestorage.app",
@@ -149,13 +158,13 @@ auth.onAuthStateChanged(async u => {
   authPanel.style.display = "none";
   appPanel.style.display = "block";
   loadBars();
-  loadInvites();
 });
 
 /* UI */
-function showTab(t) {
-  barsTab.style.display = t === "bars" ? "block" : "none";
-  invitesTab.style.display = t === "invites" ? "block" : "none";
+function showTab(tab) {
+  barsTab.style.display = tab === "bars" ? "block" : "none";
+  scheduleTab.style.display = tab === "schedule" ? "block" : "none";
+  if (tab === "schedule") loadSchedule();
 }
 
 /* BARS */
@@ -163,105 +172,73 @@ function createBar() {
   db.collection("bars").add({
     name: newBarName.value,
     owner: currentUser.uid,
-    members: { [currentUser.uid]: "Owner" }
+    members: {
+      [currentUser.uid]: ["Owner"]
+    }
   });
-  newBarName.value = "";
 }
-
 function loadBars() {
   barList.innerHTML = "";
-  inviteBar.innerHTML = "";
   db.collection("bars").onSnapshot(s => {
     barList.innerHTML = "";
-    inviteBar.innerHTML = "";
     s.forEach(d => {
       const b = d.data();
       if (b.members[currentUser.uid]) {
         barList.innerHTML += `<li onclick="selectBar('${d.id}')">${b.name}</li>`;
-        inviteBar.innerHTML += `<option value="${d.id}">${b.name}</option>`;
       }
     });
   });
 }
-
 function selectBar(id) {
   currentBarId = id;
-  showMembers();
+  loadMembersForSchedule();
+  loadSchedule();
 }
 
-/* MODERATION */
-async function showMembers() {
-  const doc = await db.collection("bars").doc(currentBarId).get();
-  const bar = doc.data();
-  const myRole = bar.members[currentUser.uid];
-  memberTable.innerHTML = "";
-  barAdmin.style.display = myRole ? "block" : "none";
-
+/* SCHEDULING */
+async function loadMembersForSchedule() {
+  const bar = (await db.collection("bars").doc(currentBarId).get()).data();
+  scheduleUser.innerHTML = "";
   for (let uid in bar.members) {
-    const userSnap = await db.collection("users").doc(uid).get();
-    const uname = userSnap.data().username;
-    const role = bar.members[uid];
-
-    let actions = "";
-    if (["Owner","Admin"].includes(myRole) && role !== "Owner") {
-      actions += `<select onchange="setRole('${uid}', this.value)">
-        <option>Member</option>
-        <option>Moderator</option>
-        <option>Admin</option>
-      </select>`;
-      actions += `<button onclick="kick('${uid}')">Kick</button>`;
-    }
-
-    memberTable.innerHTML += `<tr><td>${uname}</td><td>${role}</td><td>${actions}</td></tr>`;
+    const u = await db.collection("users").doc(uid).get();
+    scheduleUser.innerHTML += `<option value="${uid}">${u.data().username}</option>`;
   }
 }
 
-function setRole(uid, role) {
-  db.collection("bars").doc(currentBarId).update({
-    [`members.${uid}`]: role
+function createSchedule() {
+  const roles = [...document.querySelectorAll(".roleCheck:checked")].map(c => c.value);
+  if (!roles.length) return alert("Select at least one role");
+
+  db.collection("schedules").add({
+    barId: currentBarId,
+    userId: scheduleUser.value,
+    roles,
+    date: scheduleDate.value,
+    startTime: startTime.value,
+    endTime: endTime.value
   });
 }
 
-function kick(uid) {
-  db.collection("bars").doc(currentBarId).update({
-    [`members.${uid}`]: firebase.firestore.FieldValue.delete()
-  });
-}
+async function loadSchedule() {
+  scheduleTable.innerHTML = "";
+  if (!currentBarId) return;
 
-/* INVITES */
-function sendInvite() {
-  db.collection("invites").add({
-    toUsername: inviteUsername.value,
-    barId: inviteBar.value
-  });
-  inviteUsername.value = "";
-}
-
-function loadInvites() {
-  inviteList.innerHTML = "";
-  db.collection("invites")
-    .where("toUsername","==",currentUsername)
-    .onSnapshot(s => {
-      inviteList.innerHTML = "";
-      s.forEach(d => {
-        inviteList.innerHTML += `
-          <li>
-            Invitation
-            <button onclick="acceptInvite('${d.id}','${d.data().barId}')">Accept</button>
-            <button onclick="declineInvite('${d.id}')">Decline</button>
-          </li>`;
-      });
+  db.collection("schedules")
+    .where("barId", "==", currentBarId)
+    .onSnapshot(async s => {
+      scheduleTable.innerHTML = "";
+      for (let doc of s.docs) {
+        const sc = doc.data();
+        const u = await db.collection("users").doc(sc.userId).get();
+        scheduleTable.innerHTML += `
+          <tr>
+            <td>${u.data().username}</td>
+            <td>${sc.roles.join(", ")}</td>
+            <td>${sc.date}</td>
+            <td>${sc.startTime} - ${sc.endTime}</td>
+          </tr>`;
+      }
     });
-}
-
-function acceptInvite(id, barId) {
-  db.collection("bars").doc(barId).update({
-    [`members.${currentUser.uid}`]: "Member"
-  });
-  db.collection("invites").doc(id).delete();
-}
-function declineInvite(id) {
-  db.collection("invites").doc(id).delete();
 }
 </script>
 
