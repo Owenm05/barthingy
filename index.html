@@ -6,42 +6,39 @@
 
 <style>
 body {
-    font-family: Arial, sans-serif;
-    background: #1f1f1f;
-    color: #eee;
-    padding: 20px;
-}
-h1, h2, h3 {
-    color: #f4c430;
+  font-family: Arial, sans-serif;
+  background: #1f1f1f;
+  color: #eee;
+  padding: 20px;
 }
 .panel {
-    background: #333;
-    padding: 20px;
-    border-radius: 8px;
-    max-width: 900px;
-    margin-bottom: 20px;
+  background: #333;
+  padding: 20px;
+  border-radius: 8px;
+  max-width: 900px;
+  margin-bottom: 20px;
 }
 input, select, button {
-    padding: 8px;
-    width: 100%;
-    margin: 5px 0;
+  padding: 8px;
+  width: 100%;
+  margin: 6px 0;
 }
 button {
-    background: #f4c430;
-    border: none;
-    cursor: pointer;
+  background: #f4c430;
+  border: none;
+  cursor: pointer;
 }
 .tabs button {
-    width: auto;
-    margin-right: 5px;
+  width: auto;
+  margin-right: 5px;
 }
 ul {
-    list-style: none;
-    padding: 0;
+  list-style: none;
+  padding: 0;
 }
 li {
-    padding: 6px;
-    border-bottom: 1px solid #444;
+  padding: 6px;
+  border-bottom: 1px solid #444;
 }
 </style>
 </head>
@@ -51,55 +48,55 @@ li {
 
 <!-- AUTH -->
 <div id="auth" class="panel">
-    <h2>Login / Register</h2>
-    <input id="email" placeholder="Email">
-    <input id="password" type="password" placeholder="Password">
-    <input id="username" placeholder="Username (for registration)">
-    <button onclick="register()">Register</button>
-    <button onclick="login()">Login</button>
+  <h2>Login / Register</h2>
+  <input id="email" placeholder="Email">
+  <input id="password" type="password" placeholder="Password">
+  <input id="username" placeholder="Username (register only)">
+  <button onclick="register()">Register</button>
+  <button onclick="login()">Login</button>
 </div>
 
 <!-- APP -->
 <div id="app" class="panel" style="display:none;">
-    <p id="userInfo"></p>
+  <p id="userInfo"></p>
 
-    <div class="tabs">
-        <button onclick="showTab('bars')">Bars</button>
-        <button onclick="showTab('invites')">Invites</button>
-        <button onclick="logout()">Logout</button>
-    </div>
+  <div class="tabs">
+    <button onclick="showTab('bars')">Bars</button>
+    <button onclick="showTab('invites')">Invites</button>
+    <button onclick="logout()">Logout</button>
+  </div>
 
-    <!-- BARS -->
-    <div id="barsTab">
-        <h3>Your Bars</h3>
-        <ul id="barList"></ul>
+  <!-- BARS TAB -->
+  <div id="barsTab">
+    <h3>Your Bars</h3>
+    <ul id="barList"></ul>
 
-        <h3>Create New Bar</h3>
-        <input id="newBarName" placeholder="Bar name">
-        <button onclick="createBar()">Create Bar</button>
-    </div>
+    <h3>Create Bar</h3>
+    <input id="newBarName" placeholder="Bar name">
+    <button onclick="createBar()">Create</button>
+  </div>
 
-    <!-- INVITES -->
-    <div id="invitesTab" style="display:none;">
-        <h3>Send Invite</h3>
-        <input id="inviteUsername" placeholder="Username to invite">
-        <select id="inviteBar"></select>
-        <button onclick="sendInvite()">Send Invite</button>
+  <!-- INVITES TAB -->
+  <div id="invitesTab" style="display:none;">
+    <h3>Send Invite</h3>
+    <input id="inviteUsername" placeholder="Username">
+    <select id="inviteBar"></select>
+    <button onclick="sendInvite()">Send Invite</button>
 
-        <h3>Your Invites</h3>
-        <ul id="inviteList"></ul>
-    </div>
+    <h3>Your Invites</h3>
+    <ul id="inviteList"></ul>
+  </div>
 </div>
 
-<!-- ✅✅✅ FIREBASE SCRIPTS (THIS FIXES YOUR ERROR) ✅✅✅ -->
+<!-- ✅✅✅ FIREBASE SDKs (CORRECT) ✅✅✅ -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <script>
-/* 🔴 REPLACE THESE WITH YOUR REAL FIREBASE CONFIG VALUES */
+/* 🔴 REPLACE WITH YOUR REAL FIREBASE CONFIG */
 firebase.initializeApp({
-  apiKey: "AIzaSyCROUwb_jRNjHospqu86fvL9P4ajCe94c8",
+   apiKey: "AIzaSyCROUwb_jRNjHospqu86fvL9P4ajCe94c8",
   authDomain: "barthiiny.firebaseapp.com",
   projectId: "barthiiny",
   storageBucket: "barthiiny.firebasestorage.app",
@@ -108,153 +105,152 @@ firebase.initializeApp({
   measurementId: "G-8ZZMBT7913"
 });
 
-/* ✅ Firebase is now initialized BEFORE use */
 const auth = firebase.auth();
 const db = firebase.firestore();
 
 /* ===== AUTH ===== */
 
 function register() {
-    if (!email.value || !password.value || !username.value) {
-        alert("Fill all fields");
-        return;
-    }
+  if (!email.value || !password.value || !username.value) {
+    alert("Fill all fields");
+    return;
+  }
 
-    auth.createUserWithEmailAndPassword(email.value, password.value)
-        .then(cred => {
-            return db.collection("users").doc(cred.user.uid).set({
-                username: username.value
-            });
-        })
-        .then(() => {
-            alert("Registered successfully");
-        })
-        .catch(err => alert(err.message));
+  auth.createUserWithEmailAndPassword(email.value, password.value)
+    .then(cred => {
+      return db.collection("users").doc(cred.user.uid).set({
+        username: username.value
+      });
+    })
+    .then(() => {
+      alert("Registered ✅");
+    })
+    .catch(err => alert(err.message));
 }
 
 function login() {
-    auth.signInWithEmailAndPassword(email.value, password.value)
-        .catch(err => alert(err.message));
+  auth.signInWithEmailAndPassword(email.value, password.value)
+    .catch(err => alert(err.message));
 }
 
 function logout() {
-    auth.signOut();
+  auth.signOut();
 }
 
 /* ===== STATE ===== */
 
-let currentUser = null;
-let currentUsername = null;
+let currentUser;
+let currentUsername;
 
 auth.onAuthStateChanged(async user => {
-    if (!user) {
-        auth.style.display = "block";
-        app.style.display = "none";
-        return;
-    }
+  if (!user) {
+    auth.style.display = "block";
+    app.style.display = "none";
+    return;
+  }
 
-    currentUser = user;
-    const snap = await db.collection("users").doc(user.uid).get();
-    currentUsername = snap.data().username;
+  currentUser = user;
+  const snap = await db.collection("users").doc(user.uid).get();
+  currentUsername = snap.data().username;
 
-    auth.style.display = "none";
-    app.style.display = "block";
-    userInfo.textContent = `Logged in as ${currentUsername}`;
+  auth.style.display = "none";
+  app.style.display = "block";
+  userInfo.textContent = "Logged in as " + currentUsername;
 
-    loadBars();
-    loadInvites();
+  loadBars();
+  loadInvites();
 });
 
 /* ===== UI ===== */
 
 function showTab(tab) {
-    barsTab.style.display = tab === "bars" ? "block" : "none";
-    invitesTab.style.display = tab === "invites" ? "block" : "none";
+  barsTab.style.display = tab === "bars" ? "block" : "none";
+  invitesTab.style.display = tab === "invites" ? "block" : "none";
 }
 
 /* ===== BARS ===== */
 
 function createBar() {
-    if (!newBarName.value) return;
+  if (!newBarName.value) return;
 
-    db.collection("bars").add({
-        name: newBarName.value,
-        members: [currentUser.uid]
-    });
+  db.collection("bars").add({
+    name: newBarName.value,
+    members: [currentUser.uid]
+  });
 
-    newBarName.value = "";
+  newBarName.value = "";
 }
 
 function loadBars() {
+  barList.innerHTML = "";
+  inviteBar.innerHTML = "";
+
+  db.collection("bars").onSnapshot(snapshot => {
     barList.innerHTML = "";
     inviteBar.innerHTML = "";
 
-    db.collection("bars").onSnapshot(snapshot => {
-        barList.innerHTML = "";
-        inviteBar.innerHTML = "";
-
-        snapshot.forEach(doc => {
-            const bar = doc.data();
-            if (bar.members.includes(currentUser.uid)) {
-                barList.innerHTML += `<li>${bar.name}</li>`;
-                inviteBar.innerHTML += `<option value="${doc.id}">${bar.name}</option>`;
-            }
-        });
+    snapshot.forEach(doc => {
+      const bar = doc.data();
+      if (bar.members.includes(currentUser.uid)) {
+        barList.innerHTML += `<li>${bar.name}</li>`;
+        inviteBar.innerHTML += `<option value="${doc.id}">${bar.name}</option>`;
+      }
     });
+  });
 }
 
 /* ===== INVITES ===== */
 
 async function sendInvite() {
-    if (!inviteUsername.value) return alert("Enter a username");
+  if (!inviteUsername.value) return;
 
-    const usersSnap = await db.collection("users")
-        .where("username", "==", inviteUsername.value)
-        .get();
+  const userSnap = await db.collection("users")
+    .where("username", "==", inviteUsername.value)
+    .get();
 
-    if (usersSnap.empty) {
-        alert("User not found");
-        return;
-    }
+  if (userSnap.empty) {
+    alert("User not found");
+    return;
+  }
 
-    db.collection("invites").add({
-        toUsername: inviteUsername.value,
-        barId: inviteBar.value
-    });
+  db.collection("invites").add({
+    toUsername: inviteUsername.value,
+    barId: inviteBar.value
+  });
 
-    alert("Invite sent");
-    inviteUsername.value = "";
+  inviteUsername.value = "";
+  alert("Invite sent ✅");
 }
 
 function loadInvites() {
-    inviteList.innerHTML = "";
+  inviteList.innerHTML = "";
 
-    db.collection("invites")
-        .where("toUsername", "==", currentUsername)
-        .onSnapshot(snapshot => {
-            inviteList.innerHTML = "";
-            snapshot.forEach(doc => {
-                const inv = doc.data();
-                inviteList.innerHTML += `
-                    <li>
-                        Invite to bar: ${inv.barId}
-                        <button onclick="acceptInvite('${doc.id}','${inv.barId}')">Accept</button>
-                        <button onclick="declineInvite('${doc.id}')">Decline</button>
-                    </li>
-                `;
-            });
-        });
+  db.collection("invites")
+    .where("toUsername", "==", currentUsername)
+    .onSnapshot(snapshot => {
+      inviteList.innerHTML = "";
+      snapshot.forEach(doc => {
+        const inv = doc.data();
+        inviteList.innerHTML += `
+          <li>
+            Invite to bar
+            <button onclick="acceptInvite('${doc.id}','${inv.barId}')">Accept</button>
+            <button onclick="declineInvite('${doc.id}')">Decline</button>
+          </li>
+        `;
+      });
+    });
 }
 
 function acceptInvite(inviteId, barId) {
-    db.collection("bars").doc(barId).update({
-        members: firebase.firestore.FieldValue.arrayUnion(currentUser.uid)
-    });
-    db.collection("invites").doc(inviteId).delete();
+  db.collection("bars").doc(barId).update({
+    members: firebase.firestore.FieldValue.arrayUnion(currentUser.uid)
+  });
+  db.collection("invites").doc(inviteId).delete();
 }
 
 function declineInvite(inviteId) {
-    db.collection("invites").doc(inviteId).delete();
+  db.collection("invites").doc(inviteId).delete();
 }
 </script>
 
