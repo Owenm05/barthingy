@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>Bar Management System</title>
+
 <style>
 body {
     font-family: Arial, sans-serif;
@@ -53,7 +54,7 @@ li {
     <h2>Login / Register</h2>
     <input id="email" placeholder="Email">
     <input id="password" type="password" placeholder="Password">
-    <input id="username" placeholder="Username (register only)">
+    <input id="username" placeholder="Username (for registration)">
     <button onclick="register()">Register</button>
     <button onclick="login()">Login</button>
 </div>
@@ -68,7 +69,7 @@ li {
         <button onclick="logout()">Logout</button>
     </div>
 
-    <!-- BARS TAB -->
+    <!-- BARS -->
     <div id="barsTab">
         <h3>Your Bars</h3>
         <ul id="barList"></ul>
@@ -78,7 +79,7 @@ li {
         <button onclick="createBar()">Create Bar</button>
     </div>
 
-    <!-- INVITES TAB -->
+    <!-- INVITES -->
     <div id="invitesTab" style="display:none;">
         <h3>Send Invite</h3>
         <input id="inviteUsername" placeholder="Username to invite">
@@ -90,15 +91,14 @@ li {
     </div>
 </div>
 
-<!-- FIREBASE SDKs -->
+<!-- ✅✅✅ FIREBASE SCRIPTS (THIS FIXES YOUR ERROR) ✅✅✅ -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <script>
-/* ================= FIREBASE CONFIG ================= */
-/* 🔴 REPLACE WITH YOUR REAL CONFIG FROM FIREBASE */
-const firebaseConfig = {
+/* 🔴 REPLACE THESE WITH YOUR REAL FIREBASE CONFIG VALUES */
+firebase.initializeApp({
   apiKey: "AIzaSyCROUwb_jRNjHospqu86fvL9P4ajCe94c8",
   authDomain: "barthiiny.firebaseapp.com",
   projectId: "barthiiny",
@@ -106,17 +106,13 @@ const firebaseConfig = {
   messagingSenderId: "496508474938",
   appId: "1:496508474938:web:3eae7b5b67fbcb77af8703",
   measurementId: "G-8ZZMBT7913"
-};
+});
 
+/* ✅ Firebase is now initialized BEFORE use */
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-/* ================= STATE ================= */
-
-let currentUser = null;
-let currentUsername = null;
-
-/* ================= AUTH ================= */
+/* ===== AUTH ===== */
 
 function register() {
     if (!email.value || !password.value || !username.value) {
@@ -130,6 +126,9 @@ function register() {
                 username: username.value
             });
         })
+        .then(() => {
+            alert("Registered successfully");
+        })
         .catch(err => alert(err.message));
 }
 
@@ -142,9 +141,15 @@ function logout() {
     auth.signOut();
 }
 
+/* ===== STATE ===== */
+
+let currentUser = null;
+let currentUsername = null;
+
 auth.onAuthStateChanged(async user => {
     if (!user) {
-        authDiv(true);
+        auth.style.display = "block";
+        app.style.display = "none";
         return;
     }
 
@@ -152,29 +157,25 @@ auth.onAuthStateChanged(async user => {
     const snap = await db.collection("users").doc(user.uid).get();
     currentUsername = snap.data().username;
 
+    auth.style.display = "none";
+    app.style.display = "block";
     userInfo.textContent = `Logged in as ${currentUsername}`;
-    authDiv(false);
 
     loadBars();
     loadInvites();
 });
 
-/* ================= UI ================= */
-
-function authDiv(showAuth) {
-    auth.style.display = showAuth ? "block" : "none";
-    app.style.display = showAuth ? "none" : "block";
-}
+/* ===== UI ===== */
 
 function showTab(tab) {
     barsTab.style.display = tab === "bars" ? "block" : "none";
     invitesTab.style.display = tab === "invites" ? "block" : "none";
 }
 
-/* ================= BARS ================= */
+/* ===== BARS ===== */
 
 function createBar() {
-    if (!newBarName.value) return alert("Enter bar name");
+    if (!newBarName.value) return;
 
     db.collection("bars").add({
         name: newBarName.value,
@@ -202,12 +203,11 @@ function loadBars() {
     });
 }
 
-/* ================= INVITES ================= */
+/* ===== INVITES ===== */
 
 async function sendInvite() {
     if (!inviteUsername.value) return alert("Enter a username");
 
-    // Check user exists
     const usersSnap = await db.collection("users")
         .where("username", "==", inviteUsername.value)
         .get();
@@ -219,12 +219,11 @@ async function sendInvite() {
 
     db.collection("invites").add({
         toUsername: inviteUsername.value,
-        barId: inviteBar.value,
-        from: currentUsername
+        barId: inviteBar.value
     });
 
-    inviteUsername.value = "";
     alert("Invite sent");
+    inviteUsername.value = "";
 }
 
 function loadInvites() {
