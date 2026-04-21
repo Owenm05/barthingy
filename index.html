@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Bar Management + Scheduling</title>
+<title>Bar Management & Scheduling</title>
 
 <style>
 body {
@@ -16,7 +16,6 @@ body {
   padding: 20px;
   border-radius: 8px;
   max-width: 1200px;
-  margin-bottom: 20px;
 }
 input, select, button {
   padding: 8px;
@@ -39,7 +38,6 @@ table {
 td, th {
   border: 1px solid #555;
   padding: 6px;
-  text-align: center;
 }
 </style>
 </head>
@@ -67,52 +65,37 @@ td, th {
     <button onclick="logout()">Logout</button>
   </div>
 
-  <!-- BARS -->
   <div id="barsTab">
-    <h3>Your Bars</h3>
     <ul id="barList"></ul>
     <input id="newBarName" placeholder="New bar name">
     <button onclick="createBar()">Create Bar</button>
   </div>
 
-  <!-- SCHEDULE -->
   <div id="scheduleTab" style="display:none;">
-    <h3>Schedule Shifts</h3>
-
     <select id="scheduleUser"></select>
 
-    <label>
-      <input type="checkbox" value="Bartender" class="roleCheck"> Bartender
-    </label>
-    <label>
-      <input type="checkbox" value="Security" class="roleCheck"> Security
-    </label>
+    <label><input type="checkbox" value="Bartender" class="role"> Bartender</label>
+    <label><input type="checkbox" value="Security" class="role"> Security</label>
 
-    <input type="date" id="scheduleDate">
-    <input type="time" id="startTime">
-    <input type="time" id="endTime">
+    <input type="date" id="date">
+    <input type="time" id="start">
+    <input type="time" id="end">
 
-    <button onclick="createSchedule()">Assign Shift</button>
+    <button onclick="assign()">Assign Shift</button>
 
-    <h3>Upcoming Shifts</h3>
     <table>
       <thead>
-        <tr>
-          <th>User</th>
-          <th>Roles</th>
-          <th>Date</th>
-          <th>Time</th>
-        </tr>
+        <tr><th>User</th><th>Roles</th><th>Date</th><th>Time</th></tr>
       </thead>
       <tbody id="scheduleTable"></tbody>
     </table>
   </div>
 </div>
 
-<!-- FIREBASE SDKs -->
-https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.jsscript>
-https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js
-https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js>
+<!-- ✅✅✅ FIREBASE SDKs (CORRECT) ✅✅✅ -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <script>
 firebase.initializeApp({
@@ -128,14 +111,12 @@ firebase.initializeApp({
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-let currentUser, currentUsername, currentBarId;
+let currentUser, currentBarId;
 
 /* AUTH */
 function register() {
   auth.createUserWithEmailAndPassword(email.value, password.value)
-    .then(c => db.collection("users").doc(c.user.uid).set({
-      username: username.value
-    }))
+    .then(c => db.collection("users").doc(c.user.uid).set({ username: username.value }))
     .catch(e => authStatus.textContent = e.message);
 }
 function login() {
@@ -152,29 +133,22 @@ auth.onAuthStateChanged(async u => {
     return;
   }
   currentUser = u;
-  const snap = await db.collection("users").doc(u.uid).get();
-  currentUsername = snap.data().username;
-  userInfo.textContent = "Logged in as " + currentUsername;
   authPanel.style.display = "none";
   appPanel.style.display = "block";
   loadBars();
 });
 
 /* UI */
-function showTab(tab) {
-  barsTab.style.display = tab === "bars" ? "block" : "none";
-  scheduleTab.style.display = tab === "schedule" ? "block" : "none";
-  if (tab === "schedule") loadSchedule();
+function showTab(t) {
+  barsTab.style.display = t === "bars" ? "block" : "none";
+  scheduleTab.style.display = t === "schedule" ? "block" : "none";
 }
 
 /* BARS */
 function createBar() {
   db.collection("bars").add({
     name: newBarName.value,
-    owner: currentUser.uid,
-    members: {
-      [currentUser.uid]: ["Owner"]
-    }
+    members: { [currentUser.uid]: ["Owner"] }
   });
 }
 function loadBars() {
@@ -191,12 +165,12 @@ function loadBars() {
 }
 function selectBar(id) {
   currentBarId = id;
-  loadMembersForSchedule();
+  loadMembers();
   loadSchedule();
 }
 
 /* SCHEDULING */
-async function loadMembersForSchedule() {
+async function loadMembers() {
   const bar = (await db.collection("bars").doc(currentBarId).get()).data();
   scheduleUser.innerHTML = "";
   for (let uid in bar.members) {
@@ -205,37 +179,33 @@ async function loadMembersForSchedule() {
   }
 }
 
-function createSchedule() {
-  const roles = [...document.querySelectorAll(".roleCheck:checked")].map(c => c.value);
-  if (!roles.length) return alert("Select at least one role");
-
+function assign() {
+  const roles = [...document.querySelectorAll(".role:checked")].map(r => r.value);
   db.collection("schedules").add({
     barId: currentBarId,
     userId: scheduleUser.value,
     roles,
-    date: scheduleDate.value,
-    startTime: startTime.value,
-    endTime: endTime.value
+    date: date.value,
+    start: start.value,
+    end: end.value
   });
 }
 
-async function loadSchedule() {
+function loadSchedule() {
   scheduleTable.innerHTML = "";
-  if (!currentBarId) return;
-
   db.collection("schedules")
-    .where("barId", "==", currentBarId)
+    .where("barId","==",currentBarId)
     .onSnapshot(async s => {
       scheduleTable.innerHTML = "";
-      for (let doc of s.docs) {
-        const sc = doc.data();
+      for (let d of s.docs) {
+        const sc = d.data();
         const u = await db.collection("users").doc(sc.userId).get();
         scheduleTable.innerHTML += `
           <tr>
             <td>${u.data().username}</td>
             <td>${sc.roles.join(", ")}</td>
             <td>${sc.date}</td>
-            <td>${sc.startTime} - ${sc.endTime}</td>
+            <td>${sc.start} - ${sc.end}</td>
           </tr>`;
       }
     });
@@ -244,3 +214,4 @@ async function loadSchedule() {
 
 </body>
 </html>
+``
