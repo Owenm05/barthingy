@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Bar Management & Scheduling</title>
+<title>Bar Management, Invites & Scheduling</title>
 
 <style>
 body {
@@ -16,6 +16,7 @@ body {
   padding: 20px;
   border-radius: 8px;
   max-width: 1200px;
+  margin-bottom: 20px;
 }
 input, select, button {
   padding: 8px;
@@ -31,6 +32,14 @@ button {
   width: auto;
   margin-right: 5px;
 }
+ul {
+  list-style: none;
+  padding: 0;
+}
+li {
+  padding: 6px;
+  border-bottom: 1px solid #555;
+}
 table {
   width: 100%;
   border-collapse: collapse;
@@ -43,7 +52,7 @@ td, th {
 </head>
 <body>
 
-<h1>🍺 Bar Management & Scheduling</h1>
+<h1>🍺 Bar Management System</h1>
 
 <!-- AUTH -->
 <div id="authPanel" class="panel">
@@ -62,26 +71,29 @@ td, th {
   <div class="tabs">
     <button onclick="showTab('bars')">Bars</button>
     <button onclick="showTab('schedule')">Schedule</button>
+    <button onclick="showTab('invites')">Invites</button>
     <button onclick="logout()">Logout</button>
   </div>
 
+  <!-- BARS -->
   <div id="barsTab">
     <ul id="barList"></ul>
     <input id="newBarName" placeholder="New bar name">
     <button onclick="createBar()">Create Bar</button>
   </div>
 
+  <!-- SCHEDULE -->
   <div id="scheduleTab" style="display:none;">
     <select id="scheduleUser"></select>
 
-    <label><input type="checkbox" value="Bartender" class="role"> Bartender</label>
-    <label><input type="checkbox" value="Security" class="role"> Security</label>
+    <label><input type="checkbox" class="roleCheck" value="Bartender"> Bartender</label>
+    <label><input type="checkbox" class="roleCheck" value="Security"> Security</label>
 
-    <input type="date" id="date">
-    <input type="time" id="start">
-    <input type="time" id="end">
+    <input type="date" id="scheduleDate">
+    <input type="time" id="startTime">
+    <input type="time" id="endTime">
 
-    <button onclick="assign()">Assign Shift</button>
+    <button onclick="assignShift()">Assign Shift</button>
 
     <table>
       <thead>
@@ -90,9 +102,20 @@ td, th {
       <tbody id="scheduleTable"></tbody>
     </table>
   </div>
+
+  <!-- INVITES -->
+  <div id="invitesTab" style="display:none;">
+    <h3>Invite User</h3>
+    <input id="inviteUsername" placeholder="Username">
+    <select id="inviteBar"></select>
+    <button onclick="sendInvite()">Send Invite</button>
+
+    <h3>Your Invites</h3>
+    <ul id="inviteList"></ul>
+  </div>
 </div>
 
-<!-- ✅✅✅ FIREBASE SDKs (CORRECT) ✅✅✅ -->
+<!-- ✅ FIREBASE SDKs (CORRECT) -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -111,7 +134,7 @@ firebase.initializeApp({
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-let currentUser, currentBarId;
+let currentUser, currentUsername, currentBarId;
 
 /* AUTH */
 function register() {
@@ -133,15 +156,21 @@ auth.onAuthStateChanged(async u => {
     return;
   }
   currentUser = u;
+  const snap = await db.collection("users").doc(u.uid).get();
+  currentUsername = snap.data().username;
+  userInfo.textContent = "Logged in as " + currentUsername;
   authPanel.style.display = "none";
   appPanel.style.display = "block";
   loadBars();
+  loadInvites();
 });
 
 /* UI */
 function showTab(t) {
   barsTab.style.display = t === "bars" ? "block" : "none";
   scheduleTab.style.display = t === "schedule" ? "block" : "none";
+  invitesTab.style.display = t === "invites" ? "block" : "none";
+  if (t === "schedule") loadSchedule();
 }
 
 /* BARS */
@@ -153,12 +182,15 @@ function createBar() {
 }
 function loadBars() {
   barList.innerHTML = "";
+  inviteBar.innerHTML = "";
   db.collection("bars").onSnapshot(s => {
     barList.innerHTML = "";
+    inviteBar.innerHTML = "";
     s.forEach(d => {
       const b = d.data();
       if (b.members[currentUser.uid]) {
         barList.innerHTML += `<li onclick="selectBar('${d.id}')">${b.name}</li>`;
+        inviteBar.innerHTML += `<option value="${d.id}">${b.name}</option>`;
       }
     });
   });
@@ -167,6 +199,40 @@ function selectBar(id) {
   currentBarId = id;
   loadMembers();
   loadSchedule();
+}
+
+/* INVITES */
+function sendInvite() {
+  db.collection("invites").add({
+    toUsername: inviteUsername.value,
+    barId: inviteBar.value
+  });
+  inviteUsername.value = "";
+}
+function loadInvites() {
+  inviteList.innerHTML = "";
+  db.collection("invites")
+    .where("toUsername","==",currentUsername)
+    .onSnapshot(s => {
+      inviteList.innerHTML = "";
+      s.forEach(d => {
+        inviteList.innerHTML += `
+          <li>
+            Bar Invite
+            <button onclick="acceptInvite('${d.id}','${d.data().barId}')">Accept</button>
+            <button onclick="declineInvite('${d.id}')">Decline</button>
+          </li>`;
+      });
+    });
+}
+function acceptInvite(id, barId) {
+  db.collection("bars").doc(barId).update({
+    [`members.${currentUser.uid}`]: ["Member"]
+  });
+  db.collection("invites").doc(id).delete();
+}
+function declineInvite(id) {
+  db.collection("invites").doc(id).delete();
 }
 
 /* SCHEDULING */
@@ -178,21 +244,20 @@ async function loadMembers() {
     scheduleUser.innerHTML += `<option value="${uid}">${u.data().username}</option>`;
   }
 }
-
-function assign() {
-  const roles = [...document.querySelectorAll(".role:checked")].map(r => r.value);
+function assignShift() {
+  const roles = [...document.querySelectorAll(".roleCheck:checked")].map(r => r.value);
   db.collection("schedules").add({
     barId: currentBarId,
     userId: scheduleUser.value,
     roles,
-    date: date.value,
-    start: start.value,
-    end: end.value
+    date: scheduleDate.value,
+    start: startTime.value,
+    end: endTime.value
   });
 }
-
 function loadSchedule() {
   scheduleTable.innerHTML = "";
+  if (!currentBarId) return;
   db.collection("schedules")
     .where("barId","==",currentBarId)
     .onSnapshot(async s => {
@@ -205,7 +270,7 @@ function loadSchedule() {
             <td>${u.data().username}</td>
             <td>${sc.roles.join(", ")}</td>
             <td>${sc.date}</td>
-            <td>${sc.start} - ${sc.end}</td>
+            <td>${sc.start} – ${sc.end}</td>
           </tr>`;
       }
     });
@@ -214,4 +279,3 @@ function loadSchedule() {
 
 </body>
 </html>
-``
